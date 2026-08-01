@@ -1,6 +1,3 @@
-// ============================================================
-// SUPABASE CONFIG — edit these two lines only
-// Find them in: Supabase Dashboard → Settings → API
-// ============================================================
+
 window.sb_publishable_XGyc7B9aEcRhEKVhm5dTEQ_BeVpdh5V;
 window.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtcW5tb3J6bGFsbGd0bXRlcm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1ODM3NzIsImV4cCI6MjEwMTE1OTc3Mn0.8_X-t5U5jMrUlt1IN8uPNh17xlsV8IfJNJGO22b2ZVg;
