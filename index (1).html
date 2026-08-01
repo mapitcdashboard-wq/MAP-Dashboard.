@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>South Zone — WD Performance Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --ink:#14161c; --panel:#1c1f27; --panel-2:#22252f; --rule:#2d313d;
+    --text-hi:#edeef1; --text-mid:#aab0bd; --text-lo:#767c8a;
+    --gold:#c9a227; --amber:#d9a441; --teal:#4f9d8d; --coral:#d9694f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--text-hi);font-family:'Inter',sans-serif;min-height:100vh;}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 24px 60px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
+  h1{font-family:'Zilla Slab',serif;font-weight:700;font-size:30px;line-height:1.1;margin:0;letter-spacing:-.01em;}
+  .sub{color:var(--text-mid);font-size:13.5px;margin-top:8px;max-width:480px;line-height:1.5;}
+
+  #gate{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  .gate-card{background:var(--panel);border:1px solid var(--rule);border-top:3px solid var(--gold);padding:40px 36px;max-width:420px;width:100%;}
+  .gate-mark{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;margin-bottom:14px;}
+  .gate-card h1{font-size:24px;text-align:center;}
+  .gate-card .sub{margin:10px auto 24px;text-align:center;}
+  .code-input{width:100%;background:var(--panel-2);border:1px solid var(--rule);color:var(--text-hi);padding:13px 16px;font-size:16px;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;text-align:center;text-transform:uppercase;border-radius:2px;margin-bottom:12px;}
+  .code-input:focus{outline:1px solid var(--gold);}
+  .go-btn{width:100%;background:var(--gold);color:#1a1a1a;border:none;padding:13px 16px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer;border-radius:2px;}
+  .go-btn:hover{background:#dbb642;}
+  .gate-error{color:var(--coral);font-size:12.5px;margin-top:12px;display:none;}
+  .gate-error.show{display:block;}
+
+  #dashboard{display:none;}
+
+  .channel-toggle{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 20px;}
+  .channel-toggle button{background:var(--panel);border:1px solid var(--rule);color:var(--text-mid);
+    padding:9px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;
+    text-transform:uppercase;cursor:pointer;border-radius:2px;}
+  .channel-toggle button.active{background:var(--gold);color:#1a1a1a;border-color:var(--gold);font-weight:600;}
+  .channel-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-lo);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:24px;}
+  @media(min-width:640px){.kpi-row{grid-template-columns:repeat(4,1fr);}}
+  .kpi{background:var(--panel);border:1px solid var(--rule);padding:16px 18px;border-radius:2px;}
+  .kpi .label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-mid);text-transform:uppercase;letter-spacing:.05em;}
+  .kpi .value{font-family:'Zilla Slab',serif;font-size:26px;font-weight:700;margin-top:6px;}
+  .kpi .value.good{color:var(--teal);}
+  .kpi .value.bad{color:var(--coral);}
+  .kpi .value.muted{color:var(--text-lo);}
+  .kpi .foot{font-size:11px;color:var(--text-lo);margin-top:4px;}
+
+  .section-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-mid);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 12px;}
+
+  .prodcard{background:var(--panel);border:1px solid var(--rule);padding:16px 18px;border-radius:2px;margin-bottom:12px;}
+  .prodcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
+  .prodcard-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .prodcard-name{font-family:'Zilla Slab',serif;font-weight:700;font-size:16px;}
+  .prodcard-meta{font-size:11.5px;color:var(--text-lo);margin-top:2px;}
+  .metric-pill,.channel-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:2px 8px;border-radius:20px;background:var(--panel-2);color:var(--teal);white-space:nowrap;}
+  .channel-pill{color:var(--text-mid);}
+  .prodcard-rank{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 10px;border-radius:3px;white-space:nowrap;}
+  .prodcard-rank.good{background:#1c3a30;color:#7fd9ae;}
+  .prodcard-rank.bad{background:#3a2a1c;color:#e0ab6f;}
+  .prodcard-rank.na{background:var(--panel-2);color:var(--text-lo);}
+  .bar-cell{position:relative;height:10px;background:var(--panel-2);border-radius:6px;overflow:visible;margin-bottom:10px;}
+  .bar-fill{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--coral);}
+  .bar-fill.good{background:var(--teal);}
+  .bar-target-tick{position:absolute;top:-3px;width:2px;height:16px;background:var(--text-hi);opacity:.6;}
+  .prodcard-nums{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--text-mid);}
+  .pct{font-family:'IBM Plex Mono',monospace;font-weight:600;padding:2px 10px;border-radius:20px;font-size:12px;}
+  .pct.good{background:#1c3a30;color:#7fd9ae;}
+  .pct.bad{background:#3a1c1c;color:#e08787;}
+  .empty{color:var(--text-lo);font-size:13px;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="gate">
+    <div class="gate-card">
+      <div class="gate-mark">South Zone</div>
+      <h1>WD Performance Portal</h1>
+      <div class="sub">Enter your access code to view your performance.</div>
+      <input type="text" id="codeInput" class="code-input" placeholder="ACCESS CODE">
+      <button class="go-btn" onclick="viewDashboard()">View My Dashboard</button>
+      <div class="gate-error" id="gateError">Invalid code. Please check and try again.</div>
+    </div>
+  </div>
+
+  <div id="dashboard">
+    <div class="eyebrow" id="branchEyebrow">South Zone</div>
+    <h1 id="wdName">—</h1>
+    <div class="sub" id="wdMeta">—</div>
+
+    <div class="channel-label">Business / Channel</div>
+    <div class="channel-toggle" id="channelToggle"></div>
+
+    <div class="kpi-row">
+      <div class="kpi"><div class="label">Avg. Achievement</div><div class="value" id="kpiAvg">—</div><div class="foot" id="kpiAvgFoot">Across all products</div></div>
+      <div class="kpi"><div class="label">Rank in Branch</div><div class="value" id="kpiRank">—</div><div class="foot" id="kpiRankFoot">out of — WDs</div></div>
+      <div class="kpi"><div class="label">Rank in Channel</div><div class="value muted" id="kpiChannelRank">—</div><div class="foot" id="kpiChannelRankFoot">Select a business above</div></div>
+      <div class="kpi"><div class="label">Products on / above Target</div><div class="value" id="kpiOnTarget">—</div><div class="foot">of your shown products</div></div>
+    </div>
+
+    <div class="section-label">Your Performance by Product</div>
+    <div id="prodcards"></div>
+  </div>
+</div>
+
+<script>
+  const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  const CHANNEL_ORDER = ['CFP','GR2','GR1A','GR1B'];
+  let currentChannel = null; // null = ALL
+  let dashData = null;
+  let loginCode = null;
+
+  function fmt(n){ if (n===null||n===undefined) return '—'; return n>=100?n.toFixed(0):n.toFixed(2); }
+  function metricLabel(m){ return m==='UOB'?'UOB · Units':(m==='Value'?'Value':m); }
+
+  async function viewDashboard(){
+    loginCode = document.getElementById('codeInput').value.trim();
+    const errEl = document.getElementById('gateError');
+    errEl.classList.remove('show');
+    if (!loginCode){ return; }
+    await loadAndRender(null);
+  }
+
+  async function loadAndRender(channel){
+    const { data, error } = await sb.rpc('get_wd_dashboard_v2', { p_login_code: loginCode, p_channel: channel });
+    const errEl = document.getElementById('gateError');
+    if (error || !data){
+      errEl.classList.add('show');
+      return;
+    }
+    dashData = data;
+    currentChannel = channel;
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    renderDashboard();
+  }
+
+  function renderDashboard(){
+    const d = dashData;
+    document.getElementById('branchEyebrow').textContent = 'South Zone · ' + d.branch;
+    document.getElementById('wdName').textContent = d.wd_name;
+    document.getElementById('wdMeta').textContent = `${d.city || ''} · Period ${d.period}`;
+
+    // Channel toggle
+    const channels = (d.channels || []).filter(Boolean);
+    const ordered = CHANNEL_ORDER.filter(c => channels.includes(c));
+    const opts = [{key:null, label:'All'}].concat(ordered.map(c => ({key:c, label:c})));
+    const toggle = document.getElementById('channelToggle');
+    toggle.innerHTML = opts.map(o =>
+      `<button data-ch="${o.key||''}" class="${o.key===currentChannel?'active':''}">${o.label}</button>`
+    ).join('');
+    toggle.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ch = btn.dataset.ch || null;
+        loadAndRender(ch);
+      });
+    });
+
+    const rows = (d.rows || []).map(r => ({...r, pct: r.target > 0 ? (r.ach/r.target)*100 : null}));
+    const validRows = rows.filter(r => r.pct !== null);
+    const avgPct = validRows.length ? validRows.reduce((s,r)=>s+r.pct,0)/validRows.length : 0;
+
+    const kpiAvg = document.getElementById('kpiAvg');
+    kpiAvg.textContent = avgPct.toFixed(1) + '%';
+    kpiAvg.className = 'value ' + (avgPct>=100?'good':'bad');
+    document.getElementById('kpiAvgFoot').textContent = currentChannel ? `Across ${currentChannel} products` : 'Across all products';
+
+    const kpiRank = document.getElementById('kpiRank');
+    kpiRank.textContent = d.rank_in_branch ? '#'+d.rank_in_branch : '—';
+    kpiRank.className = 'value ' + (d.rank_in_branch && d.total_in_branch && d.rank_in_branch <= Math.ceil(d.total_in_branch*0.25) ? 'good':'bad');
+    document.getElementById('kpiRankFoot').textContent = `out of ${d.total_in_branch||'—'} WDs in ${d.branch}`;
+
+    const kpiChannelRank = document.getElementById('kpiChannelRank');
+    const kpiChannelRankFoot = document.getElementById('kpiChannelRankFoot');
+    if (!currentChannel){
+      kpiChannelRank.textContent = '—';
+      kpiChannelRank.className = 'value muted';
+      kpiChannelRankFoot.textContent = 'Select a business above';
+    } else {
+      kpiChannelRank.textContent = d.rank_in_channel ? '#'+d.rank_in_channel : '—';
+      kpiChannelRank.className = 'value ' + (d.rank_in_channel && d.total_in_channel && d.rank_in_channel <= Math.ceil(d.total_in_channel*0.25) ? 'good':'bad');
+      kpiChannelRankFoot.textContent = `out of ${d.total_in_channel||'—'} WDs, in ${currentChannel} (${d.branch})`;
+    }
+
+    const onTarget = validRows.filter(r=>r.pct>=100).length;
+    const kpiOnTarget = document.getElementById('kpiOnTarget');
+    kpiOnTarget.textContent = `${onTarget} / ${validRows.length}`;
+    kpiOnTarget.className = 'value ' + (validRows.length && onTarget/validRows.length>=0.5 ? 'good':'bad');
+
+    const prodcards = document.getElementById('prodcards');
+    if (rows.length === 0){
+      prodcards.innerHTML = `<div class="prodcard"><div class="empty">No products tracked for this business.</div></div>`;
+      return;
+    }
+
+    prodcards.innerHTML = rows.map(r => {
+      const hasTarget = r.target > 0;
+      const pctClass = hasTarget ? (r.pct>=100?'good':'bad') : 'na';
+      const maxBar = Math.max(r.ach, r.target) || 1;
+      const achWidth = Math.min(100, (r.ach/maxBar)*100);
+      const targetPos = Math.min(100, (r.target/maxBar)*100);
+      return `
+        <div class="prodcard">
+          <div class="prodcard-top">
+            <div>
+              <div class="prodcard-name-row">
+                <div class="prodcard-name">${r.category||''}</div>
+                <span class="metric-pill">${metricLabel(r.metric)}</span>
+                <span class="channel-pill">${r.channel}</span>
+              </div>
+              <div class="prodcard-meta">${r.level||''}</div>
+            </div>
+            <div class="prodcard-rank ${pctClass}">${hasTarget && r.product_rank ? `Rank #${r.product_rank} of ${r.product_total}` : 'No target set'}</div>
+          </div>
+          <div class="bar-cell">
+            <div class="bar-fill ${hasTarget ? (r.pct>=100?'good':'') : ''}" style="width:${achWidth}%;${!hasTarget?'background:var(--text-lo)':''}"></div>
+            <div class="bar-target-tick" style="left:${targetPos}%"></div>
+          </div>
+          <div class="prodcard-nums">
+            <span>Achievement: ${fmt(r.ach)} &nbsp;|&nbsp; Target: ${fmt(r.target)}</span>
+            ${hasTarget ? `<span class="pct ${pctClass}">${r.pct.toFixed(0)}%</span>` : `<span class="pct">—</span>`}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('codeInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') viewDashboard();
+  });
+</script>
+</body>
+</html>
