@@ -78,7 +78,7 @@
 
     <div class="card">
       <div class="eyebrow" style="margin-bottom:14px;">Upload Data</div>
-      <label>CSV file (columns: branch, code, wd, city, level, category, channel, metric, ach, target)</label>
+      <label>CSV file (your standard export — Branch, Ship-to Party, WD Name, City, Product level, PRODUCT VALUE, Channel, Metric, Ach TD, Target)</label>
       <input type="file" id="csvFile" accept=".csv">
       <label>Period (e.g. 2026-08)</label>
       <input type="text" id="periodInput" placeholder="2026-08">
@@ -179,12 +179,21 @@
 
   async function uploadCsv(){
     const period = document.getElementById('periodInput').value.trim() || new Date().toISOString().slice(0,7);
-    const rows = parsedRows.map(r => ({
-      branch: r.branch, wd_code: r.code, wd_name: r.wd, city: r.city,
-      level: r.level, category: r.value || r.category, channel: r.channel,
-      metric: r.metric, ach: parseFloat(r.ach), target: parseFloat(r.target),
-      period
-    }));
+    const rows = parsedRows
+      .filter(r => r['Branch'] && r['Ship-to Party']) // skip blank/trailing rows
+      .map(r => ({
+        branch: r['Branch'],
+        wd_code: r['Ship-to Party'],
+        wd_name: r['WD Name'],
+        city: r['City'],
+        level: r['Product level'],
+        category: r['PRODUCT VALUE'],
+        channel: r['Channel'],
+        metric: r['Metric'],
+        ach: parseFloat(r['Ach TD']),
+        target: parseFloat(r['Target']),
+        period
+      }));
     const { error } = await sb.from('wd_performance').insert(rows);
     if (error){ showMsg('uploadMsg', 'Upload failed: ' + error.message, false); return; }
     showMsg('uploadMsg', `Uploaded ${rows.length} rows for period ${period}.`, true);
