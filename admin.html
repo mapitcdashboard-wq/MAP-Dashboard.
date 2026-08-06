@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WD Portal — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<style>
+
+  :root{
+    --ink:#14161c; --panel:#1c1f27; --panel-2:#22252f; --rule:#2d313d;
+    --text-hi:#edeef1; --text-mid:#aab0bd; --text-lo:#767c8a;
+    --gold:#c9a227; --amber:#d9a441; --teal:#4f9d8d; --coral:#d9694f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--text-hi);font-family:'Inter',sans-serif;min-height:100vh;}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 24px 60px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
+  h1{font-family:'Zilla Slab',serif;font-weight:700;font-size:28px;margin:0 0 4px;}
+  .sub{color:var(--text-mid);font-size:13.5px;margin-bottom:24px;}
+  .card{background:var(--panel);border:1px solid var(--rule);border-top:3px solid var(--gold);padding:24px;margin-bottom:20px;border-radius:2px;}
+  label{display:block;font-size:12px;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;font-family:'IBM Plex Mono',monospace;}
+  input[type=email],input[type=password],input[type=text],input[type=file]{
+    width:100%;background:var(--panel-2);border:1px solid var(--rule);color:var(--text-hi);
+    padding:11px 14px;font-size:14px;border-radius:2px;margin-bottom:14px;font-family:'Inter',sans-serif;
+  }
+  button{background:var(--gold);color:#1a1a1a;border:none;padding:11px 20px;font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;cursor:pointer;border-radius:2px;}
+  button:hover{background:#dbb642;}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  button.secondary{background:transparent;border:1px solid var(--rule);color:var(--text-hi);}
+  .msg{font-size:13px;margin-top:10px;padding:10px 12px;border-radius:2px;display:none;}
+  .msg.show{display:block;}
+  .msg.ok{background:#1c3a30;color:#7fd9ae;border:1px solid #2d5c48;}
+  .msg.err{background:#3a1c1c;color:#e08787;border:1px solid #5c2d2d;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:14px;}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--rule);}
+  th{font-family:'IBM Plex Mono',monospace;text-transform:uppercase;font-size:10.5px;color:var(--text-mid);letter-spacing:.05em;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-family:'IBM Plex Mono',monospace;background:var(--panel-2);color:var(--teal);}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  .rowflex{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  select{background:var(--panel-2);border:1px solid var(--rule);color:var(--text-hi);padding:9px 12px;border-radius:2px;font-size:13px;}
+  .hint{font-size:12px;color:var(--text-lo);margin-top:6px;line-height:1.5;}
+  #app{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- LOGIN -->
+  <div id="loginScreen" style="max-width:400px;margin:60px auto;">
+    <div class="eyebrow">South Zone WD Portal</div>
+    <h1>Admin Login</h1>
+    <div class="card">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="you@company.com">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••">
+      <button onclick="doLogin()">Log In</button>
+      <div id="loginMsg" class="msg"></div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">South Zone WD Portal</div>
+        <h1>Admin Panel</h1>
+        <div class="sub" id="whoami"></div>
+      </div>
+      <button class="secondary" onclick="doLogout()">Log Out</button>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom:14px;">Upload Data</div>
+      <label>File (.csv or .xlsx — your standard export with Branch Code, WD Destination Code, WD Name, City, Product level, Product value, WD Nomenclature, Channel, Metric, L3M, LM, Target, Actual)</label>
+      <input type="file" id="csvFile" accept=".csv,.xlsx,.xls">
+      <div class="rowflex">
+        <button onclick="previewCsv()">Preview</button>
+        <button onclick="uploadCsv()" id="uploadBtn" disabled>Confirm & Upload</button>
+      </div>
+      <div class="hint">Branch managers can only upload rows for their own assigned branch — rows for other branches will be rejected by the database.</div>
+      <div id="uploadMsg" class="msg"></div>
+      <div id="previewArea"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom:14px;">Generate WD Login Code</div>
+      <div class="rowflex">
+        <input type="text" id="newWdCode" placeholder="WD code e.g. HY4352" style="max-width:220px;margin-bottom:0;">
+        <input type="text" id="newLoginCode" placeholder="Login code to give the WD" style="max-width:220px;margin-bottom:0;">
+        <button onclick="createLoginCode()">Create</button>
+      </div>
+      <div id="codeMsg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom:14px;">Upload Other Focus Activities</div>
+      <div class="hint" style="margin-bottom:12px;">Upload the branch-wide focus activity list (xlsx with BRANCH, Division, PRODUCT LEVEL, PRODUCT VALUE, Channel [optional], METRICS columns — sheets can have repeating header blocks). This replaces the previous list for the branches found in the file.</div>
+      <input type="file" id="focusFile" accept=".xlsx,.xls">
+      <button onclick="uploadFocusActivities()">Upload Focus Activities</button>
+      <div id="focusMsg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom:14px;">Bulk Generate Login Codes</div>
+      <div class="hint" style="margin-bottom:12px;">Creates a login code for every WD in your uploaded data that doesn't already have one — format: a random letter + their WD code (e.g. K-BL2097). WDs that already have a code are skipped.</div>
+      <div class="rowflex">
+        <button onclick="bulkGenerateCodes()">Generate for All WDs</button>
+        <button class="secondary" id="downloadCodesBtn" onclick="downloadCodesCsv()" style="display:none;">Download CSV</button>
+      </div>
+      <div id="bulkMsg" class="msg"></div>
+      <div id="bulkResultTable"></div>
+    </div>
+
+    <div class="card">
+      <div class="topbar" style="margin-bottom:0;">
+        <div class="eyebrow">Current Data</div>
+        <select id="periodFilter" onchange="loadData()"></select>
+      </div>
+      <div id="dataTable">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Credentials come from config.js — edit that file, not this one.
+  const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  let profile = null;
+  let parsedRows = [];
+
+  function showMsg(id, text, ok){
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg show ' + (ok ? 'ok' : 'err');
+  }
+
+  async function doLogin(){
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error){ showMsg('loginMsg', error.message, false); return; }
+    await loadProfileAndApp();
+  }
+
+  async function doLogout(){
+    await sb.auth.signOut();
+    location.reload();
+  }
+
+  async function loadProfileAndApp(){
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user){ return; }
+    const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+    if (error || !data){
+      showMsg('loginMsg', 'No profile found for this account. Ask your admin to set one up.', false);
+      return;
+    }
+    profile = data;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('whoami').textContent =
+      profile.role === 'super_admin' ? 'Super Admin — all branches' : ('Branch Manager — ' + profile.branch);
+    loadData();
+  }
+
+  document.getElementById('csvFile').addEventListener('change', () => {
+    document.getElementById('previewArea').innerHTML = '';
+    document.getElementById('uploadBtn').disabled = true;
+  });
+
+  function sheetToObjects(rows){
+    // Finds the real header row (skips blank/junk leading rows) then maps subsequent rows to objects
+    const headerIdx = rows.findIndex(r => r && r.filter(c => c !== null && c !== '').length >= 5);
+    if (headerIdx === -1) return [];
+    const headers = rows[headerIdx];
+    return rows.slice(headerIdx + 1)
+      .filter(r => r && r.some(c => c !== null && c !== ''))
+      .map(r => {
+        const obj = {};
+        headers.forEach((h, i) => { if (h) obj[String(h).trim()] = r[i]; });
+        return obj;
+      });
+  }
+
+  function previewCsv(){
+    const file = document.getElementById('csvFile').files[0];
+    if (!file){ showMsg('uploadMsg', 'Choose a file first.', false); return; }
+    const isExcel = /\.xlsx?$/i.test(file.name);
+
+    const renderPreview = (rows) => {
+      parsedRows = rows;
+      const preview = parsedRows.slice(0, 8);
+      let html = '<table><tr>' + Object.keys(preview[0] || {}).map(k => `<th>${k}</th>`).join('') + '</tr>';
+      preview.forEach(r => {
+        html += '<tr>' + Object.values(r).map(v => `<td>${v ?? ''}</td>`).join('') + '</tr>';
+      });
+      html += '</table><div class="hint">' + parsedRows.length + ' rows found. Showing first 8.</div>';
+      document.getElementById('previewArea').innerHTML = html;
+      document.getElementById('uploadBtn').disabled = false;
+    };
+
+    if (isExcel){
+      file.arrayBuffer().then(buf => {
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        renderPreview(sheetToObjects(rows));
+      });
+    } else {
+      Papa.parse(file, {
+        header: false,
+        skipEmptyLines: true,
+        complete: (results) => renderPreview(sheetToObjects(results.data))
+      });
+    }
+  }
+
+  function findKey(headers, candidates){
+    const normalized = headers.map(h => ({ orig: h, norm: h.trim().toLowerCase() }));
+    for (const c of candidates){
+      const match = normalized.find(h => h.norm === c.toLowerCase());
+      if (match) return match.orig;
+    }
+    return null;
+  }
+
+  async function uploadCsv(){
+    const period = 'latest'; // always overwrite — dashboard shows only the most recent upload
+
+    if (parsedRows.length === 0){
+      showMsg('uploadMsg', 'No rows found — click Preview first.', false);
+      return;
+    }
+    const headers = Object.keys(parsedRows[0]);
+    const keyMap = {
+      branch: findKey(headers, ['Branch', 'Sales Off.', 'Sales Off', 'Branch Code']),
+      code: findKey(headers, ['Ship-to Party', 'Ship to Party', 'WD Destination Code']),
+      wd: findKey(headers, ['WD Name']),
+      city: findKey(headers, ['City']),
+      level: findKey(headers, ['Product level', 'Product Level']),
+      category: findKey(headers, ['PRODUCT VALUE', 'Product Value', 'Product value']),
+      nomenclature: findKey(headers, ['WD Nomenclature']),
+      channel: findKey(headers, ['Channel', 'CHANNEL']),
+      metric: findKey(headers, ['Metric']),
+      ach: findKey(headers, ['Ach TD', 'Actuals', 'ACH TD', 'Actual']),
+      target: findKey(headers, ['Target']),
+      l3m: findKey(headers, ['L3M']),
+      lm: findKey(headers, ['LM'])
+    };
+
+    const missing = Object.entries(keyMap).filter(([k,v]) => !v && ['branch','code','wd','channel','ach','target'].includes(k)).map(([k]) => k);
+    if (missing.length > 0){
+      showMsg('uploadMsg', `Could not find column(s) for: ${missing.join(', ')}. Check your CSV headers match one of the expected formats.`, false);
+      return;
+    }
+
+    const rows = parsedRows
+      .filter(r => r[keyMap.branch] && r[keyMap.code])
+      .map(r => ({
+        branch: r[keyMap.branch],
+        wd_code: r[keyMap.code],
+        wd_name: r[keyMap.wd],
+        city: r[keyMap.city],
+        level: r[keyMap.level],
+        category: r[keyMap.category],
+        channel: r[keyMap.channel],
+        metric: r[keyMap.metric],
+        ach: parseFloat(r[keyMap.ach]),
+        target: parseFloat(r[keyMap.target]),
+        l3m: keyMap.l3m ? parseFloat(r[keyMap.l3m]) : null,
+        lm: keyMap.lm ? parseFloat(r[keyMap.lm]) : null,
+        wd_nomenclature: keyMap.nomenclature ? r[keyMap.nomenclature] : null,
+        period
+      }));
+
+    if (rows.length === 0){
+      showMsg('uploadMsg', 'No valid rows found in this file.', false);
+      return;
+    }
+
+    // De-duplicate: if the file has more than one row for the same
+    // WD + product + channel + metric, keep only the last one.
+    const dedupMap = new Map();
+    rows.forEach(r => {
+      const key = `${r.wd_code}|${r.category}|${r.channel}|${r.metric}`;
+      dedupMap.set(key, r);
+    });
+    const dedupedRows = [...dedupMap.values()];
+    const duplicatesRemoved = rows.length - dedupedRows.length;
+
+    // Replace existing data for this branch+period instead of appending,
+    // so re-uploading the same file doesn't create duplicates.
+    const branchesInFile = [...new Set(dedupedRows.map(r => r.branch))];
+    for (const b of branchesInFile){
+      const { error: delErr } = await sb.from('wd_performance').delete().eq('branch', b).eq('period', period);
+      if (delErr){ showMsg('uploadMsg', 'Could not clear old data: ' + delErr.message, false); return; }
+    }
+
+    const { error } = await sb.from('wd_performance').insert(dedupedRows);
+    if (error){ showMsg('uploadMsg', 'Upload failed: ' + error.message, false); return; }
+    showMsg('uploadMsg', `Uploaded ${dedupedRows.length} rows for period ${period}.` + (duplicatesRemoved > 0 ? ` (${duplicatesRemoved} duplicate row(s) in the file were collapsed automatically.)` : ''), true);
+    document.getElementById('uploadBtn').disabled = true;
+    loadData();
+  }
+
+  function parseFocusSheet(rows){
+    let headerMap = null;
+    const results = [];
+    for (const row of rows){
+      if (!row || row.every(c => c === undefined || c === null || c === '')){ headerMap = null; continue; }
+      if (row.some(c => c === 'BRANCH')){
+        headerMap = {};
+        row.forEach((val, idx) => { if (val) headerMap[String(val).trim()] = idx; });
+        continue;
+      }
+      if (headerMap){
+        const branch = row[headerMap['BRANCH']];
+        if (!branch) continue;
+        results.push({
+          branch: branch,
+          division: row[headerMap['Division']] || null,
+          level: row[headerMap['PRODUCT LEVEL']] || null,
+          activity: row[headerMap['PRODUCT VALUE']] || null,
+          channel: headerMap['Channel'] !== undefined ? (row[headerMap['Channel']] || null) : null,
+          metric: row[headerMap['METRICS']] || null
+        });
+      }
+    }
+    return results;
+  }
+
+  async function uploadFocusActivities(){
+    const file = document.getElementById('focusFile').files[0];
+    if (!file){ showMsg('focusMsg', 'Choose a file first.', false); return; }
+    showMsg('focusMsg', 'Processing…', true);
+
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    let allRows = [];
+    wb.SheetNames.forEach(name => {
+      const ws = wb.Sheets[name];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      allRows = allRows.concat(parseFocusSheet(rows));
+    });
+
+    if (allRows.length === 0){
+      showMsg('focusMsg', 'No activity rows found — check the file format.', false);
+      return;
+    }
+
+    const branches = [...new Set(allRows.map(r => r.branch))];
+    for (const b of branches){
+      const { error: delErr } = await sb.from('focus_activities').delete().eq('branch', b);
+      if (delErr){ showMsg('focusMsg', 'Could not clear old activities: ' + delErr.message, false); return; }
+    }
+
+    const { error } = await sb.from('focus_activities').insert(allRows);
+    if (error){ showMsg('focusMsg', 'Upload failed: ' + error.message, false); return; }
+    showMsg('focusMsg', `Uploaded ${allRows.length} focus activities across ${branches.length} branch(es).`, true);
+  }
+
+  let lastBulkResults = [];
+
+  async function bulkGenerateCodes(){
+    showMsg('bulkMsg', 'Working…', true);
+
+    // Get every WD in the current data (RLS already restricts branch managers to their own branch)
+    const { data: wds, error: wdErr } = await sb.from('wd_performance').select('wd_code, wd_name, branch').eq('period', 'latest');
+    if (wdErr){ showMsg('bulkMsg', 'Error loading WDs: ' + wdErr.message, false); return; }
+
+    const uniqueWds = new Map();
+    wds.forEach(w => { if (!uniqueWds.has(w.wd_code)) uniqueWds.set(w.wd_code, w); });
+
+    const { data: existing, error: exErr } = await sb.from('wd_login_codes').select('wd_code');
+    if (exErr){ showMsg('bulkMsg', 'Error checking existing codes: ' + exErr.message, false); return; }
+    const existingSet = new Set(existing.map(e => e.wd_code));
+
+    const toCreate = [...uniqueWds.values()].filter(w => !existingSet.has(w.wd_code));
+
+    if (toCreate.length === 0){
+      showMsg('bulkMsg', 'Every WD already has a login code. Nothing new to generate.', true);
+      return;
+    }
+
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const newCodes = toCreate.map(w => ({
+      wd_code: w.wd_code,
+      branch: w.branch,
+      login_code: letters[Math.floor(Math.random() * 26)] + '-' + w.wd_code
+    }));
+
+    const { error: insErr } = await sb.from('wd_login_codes').insert(newCodes);
+    if (insErr){ showMsg('bulkMsg', 'Insert failed: ' + insErr.message, false); return; }
+
+    lastBulkResults = newCodes.map(c => ({
+      wd_code: c.wd_code,
+      wd_name: (uniqueWds.get(c.wd_code) || {}).wd_name || '',
+      branch: c.branch,
+      login_code: c.login_code
+    }));
+
+    showMsg('bulkMsg', `Generated ${newCodes.length} new login codes (${existingSet.size} WDs already had one and were skipped).`, true);
+
+    let html = '<table><tr><th>WD Code</th><th>WD Name</th><th>Branch</th><th>Login Code</th></tr>';
+    lastBulkResults.forEach(r => {
+      html += `<tr><td>${r.wd_code}</td><td>${r.wd_name}</td><td>${r.branch}</td><td><strong>${r.login_code}</strong></td></tr>`;
+    });
+    html += '</table>';
+    document.getElementById('bulkResultTable').innerHTML = html;
+    document.getElementById('downloadCodesBtn').style.display = 'inline-block';
+  }
+
+  function downloadCodesCsv(){
+    if (lastBulkResults.length === 0) return;
+    const header = 'WD Code,WD Name,Branch,Login Code\n';
+    const rows = lastBulkResults.map(r => `${r.wd_code},"${r.wd_name}",${r.branch},${r.login_code}`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'wd_login_codes.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function createLoginCode(){
+    const wd_code = document.getElementById('newWdCode').value.trim();
+    const login_code = document.getElementById('newLoginCode').value.trim();
+    if (!wd_code || !login_code){ showMsg('codeMsg', 'Fill in both fields.', false); return; }
+    const branch = profile.role === 'super_admin' ? (prompt('Branch code for this WD?') || '') : profile.branch;
+    const { error } = await sb.from('wd_login_codes').insert({ wd_code, login_code, branch });
+    if (error){ showMsg('codeMsg', error.message, false); return; }
+    showMsg('codeMsg', `Login code "${login_code}" created for ${wd_code}.`, true);
+  }
+
+  async function loadData(){
+    let query = sb.from('wd_performance').select('*').order('uploaded_at', { ascending: false }).limit(200);
+    const { data, error } = await query;
+    if (error){ document.getElementById('dataTable').textContent = 'Error loading data: ' + error.message; return; }
+
+    const periods = [...new Set(data.map(r => r.period))];
+    const sel = document.getElementById('periodFilter');
+    if (sel.options.length === 0){
+      sel.innerHTML = '<option value="">All periods</option>' + periods.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+    const filterVal = sel.value;
+    const rows = filterVal ? data.filter(r => r.period === filterVal) : data;
+
+    let html = '<table><tr><th>Branch</th><th>WD Code</th><th>WD Name</th><th>Category</th><th>Channel</th><th>Metric</th><th>Ach</th><th>Target</th><th>Period</th></tr>';
+    rows.slice(0, 100).forEach(r => {
+      html += `<tr><td>${r.branch}</td><td>${r.wd_code}</td><td>${r.wd_name}</td><td>${r.category||''}</td><td><span class="pill">${r.channel}</span></td><td>${r.metric}</td><td>${r.ach}</td><td>${r.target}</td><td>${r.period}</td></tr>`;
+    });
+    html += '</table><div class="hint">Showing ' + Math.min(rows.length,100) + ' of ' + rows.length + ' rows.</div>';
+    document.getElementById('dataTable').innerHTML = html;
+  }
+
+  // auto-login if session exists
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session) loadProfileAndApp();
+  });
+</script>
+</body>
+</html>
