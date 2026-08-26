@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>South Zone — WD Performance Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --ink:#14161c; --panel:#1c1f27; --panel-2:#22252f; --rule:#2d313d;
+    --text-hi:#edeef1; --text-mid:#aab0bd; --text-lo:#767c8a;
+    --gold:#c9a227; --amber:#d9a441; --teal:#4f9d8d; --coral:#d9694f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--text-hi);font-family:'Inter',sans-serif;min-height:100vh;}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 24px 60px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
+  h1{font-family:'Zilla Slab',serif;font-weight:700;font-size:30px;line-height:1.1;margin:0;letter-spacing:-.01em;}
+  .sub{color:var(--text-mid);font-size:13.5px;margin-top:8px;max-width:480px;line-height:1.5;}
+
+  #gate{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  .gate-card{background:var(--panel);border:1px solid var(--rule);border-top:3px solid var(--gold);padding:40px 36px;max-width:420px;width:100%;}
+  .gate-mark{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;margin-bottom:14px;}
+  .gate-card h1{font-size:24px;text-align:center;}
+  .gate-card .sub{margin:10px auto 24px;text-align:center;}
+  .code-input{width:100%;background:var(--panel-2);border:1px solid var(--rule);color:var(--text-hi);padding:13px 16px;font-size:16px;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;text-align:center;text-transform:uppercase;border-radius:2px;margin-bottom:12px;}
+  .code-input:focus{outline:1px solid var(--gold);}
+  .go-btn{width:100%;background:var(--gold);color:#1a1a1a;border:none;padding:13px 16px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer;border-radius:2px;}
+  .go-btn:hover{background:#dbb642;}
+  .gate-error{color:var(--coral);font-size:12.5px;margin-top:12px;display:none;}
+  .gate-error.show{display:block;}
+
+  #dashboard{display:none;}
+
+  .channel-toggle{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 20px;}
+  .channel-toggle button{background:var(--panel);border:1px solid var(--rule);color:var(--text-mid);
+    padding:9px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;
+    text-transform:uppercase;cursor:pointer;border-radius:2px;}
+  .channel-toggle button.active{background:var(--gold);color:#1a1a1a;border-color:var(--gold);font-weight:600;}
+  .channel-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-lo);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:24px;}
+  @media(min-width:640px){.kpi-row{grid-template-columns:repeat(4,1fr);}}
+  .kpi{background:var(--panel);border:1px solid var(--rule);padding:16px 18px;border-radius:2px;}
+  .kpi .label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-mid);text-transform:uppercase;letter-spacing:.05em;}
+  .kpi .value{font-family:'Zilla Slab',serif;font-size:26px;font-weight:700;margin-top:6px;}
+  .kpi .value.good{color:var(--teal);}
+  .kpi .value.bad{color:var(--coral);}
+  .kpi .value.muted{color:var(--text-lo);}
+  .kpi .foot{font-size:11px;color:var(--text-lo);margin-top:4px;}
+  .kpi.clickable{cursor:pointer;transition:border-color .15s;}
+  .kpi.clickable:hover{border-color:var(--gold);}
+  .kpi .tap-hint{font-size:10px;color:var(--gold);margin-top:6px;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;}
+
+  /* Pace colour bands */
+  .pace-1{color:#4fbf8b;}   /* well ahead - deep green */
+  .pace-2{color:#7fd9ae;}   /* on track - light green */
+  .pace-3{color:#d9c441;}   /* slightly behind - yellow */
+  .pace-4{color:#d9a441;}   /* behind - amber */
+  .pace-5{color:#d9694f;}   /* well behind - red */
+  .bar-fill.pace-1{background:#4fbf8b;}
+  .bar-fill.pace-2{background:#7fd9ae;}
+  .bar-fill.pace-3{background:#d9c441;}
+  .bar-fill.pace-4{background:#d9a441;}
+  .bar-fill.pace-5{background:#d9694f;}
+  .pct.pace-1{background:#173d2c;color:#4fbf8b;}
+  .pct.pace-2{background:#1c3a30;color:#7fd9ae;}
+  .pct.pace-3{background:#3a3a1c;color:#d9c441;}
+  .pct.pace-4{background:#3a2f1c;color:#d9a441;}
+  .pct.pace-5{background:#3a1c1c;color:#e08787;}
+  .status-chip{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;
+    padding:2px 8px;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;margin-left:8px;}
+  .status-chip.pace-1,.status-chip.pace-2{background:#1c3a30;color:#7fd9ae;}
+  .status-chip.pace-3{background:#3a3a1c;color:#d9c441;}
+  .status-chip.pace-4{background:#3a2f1c;color:#d9a441;}
+  .status-chip.pace-5{background:#3a1c1c;color:#e08787;}
+
+  /* Leaderboard modal */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+    align-items:center;justify-content:center;padding:20px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--rule);border-top:3px solid var(--gold);
+    max-width:520px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;border-radius:2px;}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+  .modal-title{font-family:'Zilla Slab',serif;font-weight:700;font-size:20px;}
+  .modal-sub{font-size:12px;color:var(--text-lo);margin-top:4px;}
+  .modal-close{background:transparent;border:1px solid var(--rule);color:var(--text-hi);
+    padding:6px 12px;font-size:16px;line-height:1;cursor:pointer;border-radius:2px;}
+  .lb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--rule);}
+  .lb-row.me{background:var(--panel-2);border-left:3px solid var(--gold);}
+  .lb-rank{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text-mid);min-width:34px;}
+  .lb-rank.top3{color:var(--gold);font-weight:600;}
+  .lb-name{flex:1;font-size:13.5px;}
+  .lb-city{font-size:11px;color:var(--text-lo);}
+  .lb-pct{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;}
+  .lb-note{font-size:11.5px;color:var(--text-lo);margin-top:14px;line-height:1.5;}
+
+  .section-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-mid);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 12px;}
+
+  .prodcard{background:var(--panel);border:1px solid var(--rule);padding:16px 18px;border-radius:2px;margin-bottom:12px;}
+  .prodcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
+  .prodcard-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .prodcard-name{font-family:'Zilla Slab',serif;font-weight:700;font-size:16px;}
+  .prodcard-meta{font-size:11.5px;color:var(--text-lo);margin-top:2px;}
+  .metric-pill,.channel-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:2px 8px;border-radius:20px;background:var(--panel-2);color:var(--teal);white-space:nowrap;}
+  .channel-pill{color:var(--text-mid);}
+  .prodcard-rank{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 10px;border-radius:3px;white-space:nowrap;}
+  .prodcard-rank.good{background:#1c3a30;color:#7fd9ae;}
+  .prodcard-rank.bad{background:#3a2a1c;color:#e0ab6f;}
+  .prodcard-rank.na{background:var(--panel-2);color:var(--text-lo);}
+  .bar-cell{position:relative;height:10px;background:var(--panel-2);border-radius:6px;overflow:visible;margin-bottom:10px;}
+  .bar-fill{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--coral);}
+  .bar-fill.good{background:var(--teal);}
+  .bar-target-tick{position:absolute;top:-3px;width:2px;height:16px;background:var(--text-hi);opacity:.6;}
+  .prodcard-nums{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--text-mid);}
+  .pct{font-family:'IBM Plex Mono',monospace;font-weight:600;padding:2px 10px;border-radius:20px;font-size:12px;}
+  .pct.good{background:#1c3a30;color:#7fd9ae;}
+  .pct.bad{background:#3a1c1c;color:#e08787;}
+  .l3m-tab{display:inline-block;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-lo);
+    background:var(--panel-2);padding:3px 9px;border-radius:3px;border:1px solid var(--rule);}
+  .empty{color:var(--text-lo);font-size:13px;text-align:center;padding:20px;}
+  .actcard{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--amber);padding:12px 16px;border-radius:2px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .actcard-name{font-family:'Zilla Slab',serif;font-weight:600;font-size:14.5px;}
+  .actcard-meta{font-size:11.5px;color:var(--text-lo);margin-top:2px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="gate">
+    <div class="gate-card">
+      <div class="gate-mark">South Zone</div>
+      <h1>WD Performance Portal</h1>
+      <div class="sub">Enter your access code to view your performance.</div>
+      <input type="text" id="codeInput" class="code-input" placeholder="ACCESS CODE" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button class="go-btn" onclick="viewDashboard()">View My Dashboard</button>
+      <div class="gate-error" id="gateError">Invalid code. Please check and try again.</div>
+    </div>
+  </div>
+
+  <div id="dashboard">
+    <div class="eyebrow" id="branchEyebrow">South Zone</div>
+    <h1 id="wdName">—</h1>
+    <div class="sub" id="wdMeta">—</div>
+
+    <div class="channel-label">Business / Channel</div>
+    <div class="channel-toggle" id="channelToggle"></div>
+
+    <div class="kpi-row">
+      <div class="kpi"><div class="label">Avg. Achievement</div><div class="value" id="kpiAvg">—</div><div class="foot" id="kpiAvgFoot">Across all products</div></div>
+      <div class="kpi clickable" id="kpiRankCard" onclick="openLeaderboard()"><div class="label">Rank in Branch</div><div class="value" id="kpiRank">—</div><div class="foot" id="kpiRankFoot">out of — WDs</div><div class="tap-hint">Tap for Top 10 →</div></div>
+      <div class="kpi clickable" id="kpiChannelCard" onclick="openLeaderboard()"><div class="label">Rank in Channel</div><div class="value muted" id="kpiChannelRank">—</div><div class="foot" id="kpiChannelRankFoot">—</div><div class="tap-hint">Tap for Top 10 →</div></div>
+      <div class="kpi"><div class="label">Products on / above Target</div><div class="value" id="kpiOnTarget">—</div><div class="foot">of your shown products</div></div>
+    </div>
+
+    <div class="section-label">Your Performance by Product</div>
+    <div id="prodcards"></div>
+
+    <div class="section-label">Other Focus Activities</div>
+    <div id="activityCards"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="leaderboardModal" onclick="closeLeaderboardBg(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="lbTitle">Top 10 WDs</div>
+        <div class="modal-sub" id="lbSub">—</div>
+      </div>
+      <button class="modal-close" onclick="closeLeaderboard()">×</button>
+    </div>
+    <div id="lbBody">Loading…</div>
+  </div>
+</div>
+
+<script>
+  const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  const CHANNEL_ORDER = ['CFP','GR2','GR1A','GR1B'];
+  let currentChannel = null; // null = ALL
+  let dashData = null;
+  let loginCode = null;
+
+  function fmt(n){ if (n===null||n===undefined) return '—'; return n>=100?n.toFixed(0):n.toFixed(2); }
+  function metricLabel(m){ return m==='UOB'?'UOB · Units':(m==='Value'?'Value':m); }
+
+  // Expected pace by week: W1 21%, W2 45%, W3 70%, W4 100%
+  const PACE_TARGETS = { '1': 21, '2': 45, '3': 70, '4': 100 };
+
+  function paceInfo(pct, week){
+    const expected = PACE_TARGETS[String(week)] || 100;
+    if (pct === null || pct === undefined) return { cls: 'pace-5', label: '—', expected };
+    const ratio = (pct / expected) * 100; // % of where they should be by now
+    if (ratio >= 110) return { cls: 'pace-1', label: 'Ahead', expected };
+    if (ratio >= 100) return { cls: 'pace-2', label: 'On Track', expected };
+    if (ratio >= 85)  return { cls: 'pace-3', label: 'Slightly Behind', expected };
+    if (ratio >= 70)  return { cls: 'pace-4', label: 'Behind', expected };
+    return { cls: 'pace-5', label: 'Well Behind', expected };
+  }
+
+  async function openLeaderboard(){
+    const modal = document.getElementById('leaderboardModal');
+    modal.classList.add('show');
+    document.getElementById('lbTitle').textContent = currentChannel ? `Top 10 — ${currentChannel}` : 'Top 10 — Overall';
+    document.getElementById('lbSub').textContent = `${dashData.branch} branch · by average achievement`;
+    document.getElementById('lbBody').innerHTML = 'Loading…';
+
+    const { data, error } = await sb.rpc('get_leaderboard', { p_login_code: loginCode, p_channel: currentChannel });
+    if (error || !data || !data.top){
+      document.getElementById('lbBody').innerHTML = '<div class="empty">Could not load the leaderboard.</div>';
+      return;
+    }
+
+    const week = dashData.current_week || '1';
+    let html = data.top.map(r => {
+      const p = paceInfo(r.avg_pct, week);
+      return `
+        <div class="lb-row ${r.is_me ? 'me' : ''}">
+          <div class="lb-rank ${r.rank <= 3 ? 'top3' : ''}">#${r.rank}</div>
+          <div class="lb-name">${r.wd_name}${r.is_me ? ' <strong style="color:var(--gold)">(You)</strong>' : ''}
+            <div class="lb-city">${r.city || ''}</div>
+          </div>
+          <div class="lb-pct ${p.cls}">${r.avg_pct}%</div>
+        </div>`;
+    }).join('');
+
+    const meInTop = data.top.some(r => r.is_me);
+    if (!meInTop && data.me){
+      const p = paceInfo(data.me.avg_pct, week);
+      html += `<div style="margin-top:10px;border-top:1px dashed var(--rule);padding-top:10px;">
+        <div class="lb-row me">
+          <div class="lb-rank">#${data.me.rank}</div>
+          <div class="lb-name">${data.me.wd_name} <strong style="color:var(--gold)">(You)</strong></div>
+          <div class="lb-pct ${p.cls}">${data.me.avg_pct}%</div>
+        </div></div>`;
+    }
+
+    html += `<div class="lb-note">Ranked on average achievement across ${currentChannel ? currentChannel + ' products' : 'all products'} in your branch.</div>`;
+    document.getElementById('lbBody').innerHTML = html;
+  }
+
+  function closeLeaderboard(){
+    document.getElementById('leaderboardModal').classList.remove('show');
+  }
+  function closeLeaderboardBg(e){
+    if (e.target.id === 'leaderboardModal') closeLeaderboard();
+  }
+
+  async function viewDashboard(){
+    loginCode = document.getElementById('codeInput').value.trim();
+    const errEl = document.getElementById('gateError');
+    errEl.classList.remove('show');
+    if (!loginCode){ return; }
+    await loadAndRender(null);
+  }
+
+  async function loadAndRender(channel){
+    const { data, error } = await sb.rpc('get_wd_dashboard_v2', { p_login_code: loginCode, p_channel: channel });
+    const errEl = document.getElementById('gateError');
+    if (error || !data){
+      errEl.classList.add('show');
+      return;
+    }
+    dashData = data;
+    currentChannel = channel;
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    renderDashboard();
+  }
+
+  function renderDashboard(){
+    const d = dashData;
+    document.getElementById('branchEyebrow').textContent = 'South Zone · ' + d.branch;
+    document.getElementById('wdName').textContent = d.wd_name;
+    document.getElementById('wdMeta').textContent = `${d.city || ''} · Updated ${d.updated_at ? new Date(d.updated_at).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) : '—'}`;
+
+    // Channel toggle
+    const channels = (d.channels || []).filter(Boolean);
+    const ordered = CHANNEL_ORDER.filter(c => channels.includes(c));
+    const opts = [{key:null, label:'All'}].concat(ordered.map(c => ({key:c, label:c})));
+    const toggle = document.getElementById('channelToggle');
+    toggle.innerHTML = opts.map(o =>
+      `<button data-ch="${o.key||''}" class="${o.key===currentChannel?'active':''}">${o.label}</button>`
+    ).join('');
+    toggle.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ch = btn.dataset.ch || null;
+        loadAndRender(ch);
+      });
+    });
+
+    const rows = (d.rows || []).map(r => ({...r, pct: r.target > 0 ? (r.ach/r.target)*100 : null}));
+    const validRows = rows.filter(r => r.pct !== null);
+    const avgPct = validRows.length ? validRows.reduce((s,r)=>s+r.pct,0)/validRows.length : 0;
+
+    const week = d.current_week || '1';
+    const kpiAvg = document.getElementById('kpiAvg');
+    const avgPace = paceInfo(avgPct, week);
+    kpiAvg.textContent = avgPct.toFixed(1) + '%';
+    kpiAvg.className = 'value ' + avgPace.cls;
+    document.getElementById('kpiAvgFoot').innerHTML =
+      `${currentChannel ? 'Across ' + currentChannel + ' products' : 'Across all products'}<span class="status-chip ${avgPace.cls}">${avgPace.label}</span><br><span style="font-size:10.5px;">Week ${week} pace: ${avgPace.expected}% expected</span>`;
+
+    const kpiRank = document.getElementById('kpiRank');
+    kpiRank.textContent = d.rank_in_branch ? '#'+d.rank_in_branch : '—';
+    kpiRank.className = 'value ' + (d.rank_in_branch && d.total_in_branch && d.rank_in_branch <= Math.ceil(d.total_in_branch*0.25) ? 'good':'bad');
+    document.getElementById('kpiRankFoot').textContent = `out of ${d.total_in_branch||'—'} WDs in ${d.branch}`;
+
+    // Rank in Channel only makes sense inside a channel tab — hide it on "All"
+    const channelCard = document.getElementById('kpiChannelCard');
+    if (!currentChannel){
+      channelCard.style.display = 'none';
+    } else {
+      channelCard.style.display = 'block';
+      const kpiChannelRank = document.getElementById('kpiChannelRank');
+      kpiChannelRank.textContent = d.rank_in_channel ? '#'+d.rank_in_channel : '—';
+      kpiChannelRank.className = 'value ' + (d.rank_in_channel && d.total_in_channel && d.rank_in_channel <= Math.ceil(d.total_in_channel*0.25) ? 'good':'bad');
+      document.getElementById('kpiChannelRankFoot').textContent = `out of ${d.total_in_channel||'—'} WDs, in ${currentChannel} (${d.branch})`;
+    }
+
+    const onTarget = validRows.filter(r=>r.pct>=100).length;
+    const kpiOnTarget = document.getElementById('kpiOnTarget');
+    kpiOnTarget.textContent = `${onTarget} / ${validRows.length}`;
+    kpiOnTarget.className = 'value ' + (validRows.length && onTarget/validRows.length>=0.5 ? 'good':'bad');
+
+    const prodcards = document.getElementById('prodcards');
+    if (rows.length === 0){
+      prodcards.innerHTML = `<div class="prodcard"><div class="empty">No products tracked for this business.</div></div>`;
+      return;
+    }
+
+    prodcards.innerHTML = rows.map(r => {
+      const hasTarget = r.target > 0;
+      const p = hasTarget ? paceInfo(r.pct, week) : { cls: 'na', label: '' };
+      const maxBar = Math.max(r.ach, r.target) || 1;
+      const achWidth = Math.min(100, (r.ach/maxBar)*100);
+      const targetPos = Math.min(100, (r.target/maxBar)*100);
+      return `
+        <div class="prodcard">
+          <div class="prodcard-top">
+            <div>
+              <div class="prodcard-name-row">
+                <div class="prodcard-name">${r.wd_nomenclature || r.category || ''}</div>
+                <span class="metric-pill">${metricLabel(r.metric)}</span>
+                <span class="channel-pill">${r.channel}</span>
+                ${hasTarget ? `<span class="status-chip ${p.cls}">${p.label}</span>` : ''}
+              </div>
+              <div class="prodcard-meta">${r.level||''}</div>
+            </div>
+            <div class="prodcard-rank ${hasTarget ? (r.pct>=100?'good':'bad') : 'na'}">${hasTarget && r.product_rank ? `Rank #${r.product_rank} of ${r.product_total}` : 'No target set'}</div>
+          </div>
+          <div class="bar-cell">
+            <div class="bar-fill ${hasTarget ? p.cls : ''}" style="width:${achWidth}%;${!hasTarget?'background:var(--text-lo)':''}"></div>
+            <div class="bar-target-tick" style="left:${targetPos}%"></div>
+          </div>
+          <div class="prodcard-nums">
+            <span>Ach TD: ${fmt(r.ach)} &nbsp;|&nbsp; Target: ${fmt(r.target)}</span>
+            ${hasTarget ? `<span class="pct ${p.cls}">${r.pct.toFixed(0)}%</span>` : `<span class="pct">—</span>`}
+          </div>
+          ${r.l3m !== null && r.l3m !== undefined ? `<div class="l3m-tab">L3M Avg: ${fmt(r.l3m)}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    const activities = d.focus_activities || [];
+    const activityCards = document.getElementById('activityCards');
+    if (activities.length === 0){
+      activityCards.innerHTML = `<div class="empty">No other focus activities listed for your branch right now.</div>`;
+    } else {
+      activityCards.innerHTML = activities.map(a => `
+        <div class="actcard">
+          <div>
+            <div class="actcard-name">${a.activity || ''}</div>
+            <div class="actcard-meta">${a.division ? a.division + ' · ' : ''}${a.level || ''}${a.metric ? ' · ' + a.metric : ''}</div>
+          </div>
+          <span class="channel-pill">${a.channel}</span>
+        </div>
+      `).join('');
+    }
+  }
+
+  document.getElementById('codeInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') viewDashboard();
+  });
+</script>
+</body>
+</html>
